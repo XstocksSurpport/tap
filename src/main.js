@@ -1244,9 +1244,11 @@ function renderStake() {
           </div>
           <div class="meta-row"><span data-stake-balance="1">${state.stakeBalanceText}</span></div>
           ${gasBlock}
-          <button type="button" class="btn-block" data-action="stake-connect" ${needWallet ? "" : "disabled"}>
-            ${needWallet ? connectLabel : "Wallet connected"}
-          </button>
+          ${
+            needWallet
+              ? `<button type="button" class="btn-block" data-action="stake-connect">${connectLabel}</button>`
+              : `<button type="button" class="btn-block" data-action="stake-submit">Confirm stake in wallet</button>`
+          }
         </div>
         <div class="summary-panel">
           <h3>Summary</h3>
@@ -1258,9 +1260,6 @@ function renderStake() {
               state.stakeAsset === "evm_nat" ? evmRecipientAddress() : brc20RecipientAddress()
             )}). APR and lock duration are product terms shown here for your records; enforcement is off-chain unless you use an audited staking contract.
           </p>
-          <button type="button" class="btn-block" style="margin-top:1rem" data-action="stake-submit" ${needWallet ? "disabled" : ""}>
-            Confirm stake in wallet
-          </button>
         </div>
       </div>
     </main>
