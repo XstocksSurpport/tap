@@ -21,8 +21,13 @@ import satsWallet, {
 const DEFAULT_EVM_RECIPIENT = "0xD866394fFddfaA6E2a62ec3E56Bd3Af57788674C";
 const DEFAULT_BRC20_RECIPIENT =
   "bc1pvx4s6ca8mcgjw39f0laxze4gs038vuvfzksuh2z69vvnwnhcu0qsagt83a";
-/** DMT-NAT（ERC-20），与 UI 中 NAT 选项对应 */
+/** 以太坊主网 DMT-NAT（ERC-20）合约；可用 `VITE_NAT_CONTRACT` 覆盖 */
 const DEFAULT_NAT_TOKEN = "0x249130f5e2dd4cf278180c0df8273f3592ad1247";
+
+/** BRC-20 路径仅 `window.tapprotocol.singleTxTransfer`（Tap Wallet 扩展）支持 */
+const NEED_TAP_WALLET_CODE = "NEED_TAP_WALLET";
+const TAP_WALLET_TOAST_ZH =
+  "BRC-20 NAT 要用 Tap Protocol 官方浏览器扩展「Tap Wallet」才能发起转账。请先安装扩展，再点顶部「Connect BRC-20」并选择列表里的 Tap Wallet（当前连接的 UniSat / Xverse 不能发 BRC-20 NAT）。";
 
 /** 当前配置的 NAT 代币仅在以太坊主网；选 NAT 时锁定该网络，避免在 L2 误调错误合约 */
 const NAT_EVM_CHAIN_ID = 1;
@@ -242,6 +247,8 @@ const state = {
   stakePeriodId: "1m",
   stakeAmount: "",
   stakeBalanceText: "Balance: —",
+  /** 质押页自定义下拉：`asset` | `period` | null */
+  stakeDropdownOpen: null,
   /** true: Ethereum → TAP Protocol */
   ethToTap: true,
   /** from EVM: NAT (ERC-20) or NATIVE (ETH / chain gas token) */
@@ -694,11 +701,21 @@ async function transferEvmNatToRecipient(amtStr) {
  * BRC-20 NAT 转入 Taproot 收款地址（与 Bridge 一致，需 Tap Wallet）。
  * @param {string} amtStr
  */
+function throwNeedTapWallet() {
+  const e = new Error("Tap Wallet required for BRC-20 NAT");
+  e.code = NEED_TAP_WALLET_CODE;
+  return e;
+}
+
+function isNeedTapWalletError(err) {
+  return err?.code === NEED_TAP_WALLET_CODE;
+}
+
 async function transferBrc20NatToPool(amtStr) {
   if (!amtStr) throw new Error("Enter amount");
   const t = window.tapprotocol;
   if (state.btcWalletId !== "tap" || typeof t?.singleTxTransfer !== "function") {
-    throw new Error("Use Tap Wallet");
+    throw throwNeedTapWallet();
   }
   const dest = brc20RecipientAddress();
   return t.singleTxTransfer([{ addr: dest, tick: "NAT", amt: amtStr }]);
@@ -773,8 +790,8 @@ async function bridgeFromTap() {
     if (sumEl) sumEl.textContent = "0";
     render();
   } catch (err) {
-    if (err?.message === "Use Tap Wallet") {
-      showToast("Use Tap Wallet");
+    if (isNeedTapWalletError(err)) {
+      showToast(TAP_WALLET_TOAST_ZH);
       return;
     }
     throw err;
@@ -888,8 +905,8 @@ async function submitStake() {
     await refreshStakeBalance();
     render();
   } catch (err) {
-    if (err?.message === "Use Tap Wallet") {
-      showToast("Use Tap Wallet");
+    if (isNeedTapWalletError(err)) {
+      showToast(TAP_WALLET_TOAST_ZH);
       return;
     }
     throw err;
@@ -973,6 +990,7 @@ function renderBtcModal() {
             </button>
           </li>
         </ul>
+        <p class="modal-brc20-hint">BRC-20 NAT 转出或质押需使用 Tap Wallet。UniSat / Xverse 可连接地址，但本页不会用它们发起 BRC-20 NAT 转账。</p>
       </div>
     </div>
   `;
@@ -1145,14 +1163,30 @@ function shortAddr(addr) {
   return s;
 }
 
+function stakeAssetLabel() {
+  return state.stakeAsset === "brc20_nat" ? "Bitcoin — BRC-20 NAT" : "Ethereum — NAT (ERC-20)";
+}
+
 function renderStake() {
   const natAddr = natTokenAddress();
-  const natShort = `${natAddr.slice(0, 6)}…${natAddr.slice(-4)}`;
-  const evmSel = state.stakeAsset === "evm_nat" ? "selected" : "";
-  const brcSel = state.stakeAsset === "brc20_nat" ? "selected" : "";
-  const periodOpts = STAKE_PERIODS.map(
-    (p) =>
-      `<option value="${p.id}" ${state.stakePeriodId === p.id ? "selected" : ""}>${p.label}</option>`
+  const assetMenuOpen = state.stakeDropdownOpen === "asset";
+  const periodMenuOpen = state.stakeDropdownOpen === "period";
+  const assetOptionsHtml = [
+    { id: "evm_nat", label: "Ethereum — NAT (ERC-20)" },
+    { id: "brc20_nat", label: "Bitcoin — BRC-20 NAT" },
+  ]
+    .map(
+      (o) => `
+      <button type="button" role="menuitem" class="custom-dd-option ${state.stakeAsset === o.id ? "is-active" : ""}" data-stake-pick-asset="${o.id}">
+        ${o.label}
+      </button>`
+    )
+    .join("");
+  const periodOptionsHtml = STAKE_PERIODS.map(
+    (p) => `
+      <button type="button" role="menuitem" class="custom-dd-option ${state.stakePeriodId === p.id ? "is-active" : ""}" data-stake-pick-period="${p.id}">
+        ${p.label}
+      </button>`
   ).join("");
   const period = STAKE_PERIODS.find((p) => p.id === state.stakePeriodId) || STAKE_PERIODS[1];
   const rewardPreview = stakeRewardEstimateText(state.stakeAmount, state.stakePeriodId);
@@ -1175,27 +1209,38 @@ function renderStake() {
 
   const assetNote =
     state.stakeAsset === "evm_nat"
-      ? `DMT-NAT (ERC-20) on Ethereum · <span class="mono">${natShort}</span> · <a class="stake-link" href="https://etherscan.io/token/${natAddr}" target="_blank" rel="noreferrer">Etherscan</a>`
-      : `BRC-20 NAT on Bitcoin (no EVM contract; tick <span class="mono">NAT</span>) · <a class="stake-link" href="${NAT_CMC_URL}" target="_blank" rel="noreferrer">CoinMarketCap</a>`;
+      ? `以太坊主网 DMT-NAT（ERC-20）合约地址：<span class="mono mono--addr">${natAddr}</span> · <a class="stake-link" href="https://etherscan.io/token/${natAddr}" target="_blank" rel="noreferrer">Etherscan</a>`
+      : `比特币 BRC-20，无 EVM 合约；铭文协议里 tick 为 <span class="mono">NAT</span> · <a class="stake-link" href="${NAT_CMC_URL}" target="_blank" rel="noreferrer">CoinMarketCap</a>`;
 
   return `
     <main class="main-wrap">
       <div class="bridge-card">
         <div class="panel">
           <div class="field-label">Stake NAT</div>
-          <div class="select-row select-row--network">
-            <span class="network-prefix">Asset</span>
-            <select data-field="stake-asset" class="network-select">
-              <option value="evm_nat" ${evmSel}>Ethereum — NAT (ERC-20)</option>
-              <option value="brc20_nat" ${brcSel}>Bitcoin — BRC-20 NAT</option>
-            </select>
-            ${chevronSvg()}
+          <div class="custom-dd-wrap" data-dropdown-wrap="1">
+            <div class="select-row select-row--network select-row--dd">
+              <span class="network-prefix">Asset</span>
+              <button type="button" class="custom-dd-trigger" data-action="stake-dd-asset" aria-expanded="${assetMenuOpen}" aria-haspopup="menu">
+                <span class="custom-dd-value">${stakeAssetLabel()}</span>
+                ${chevronSvg()}
+              </button>
+            </div>
+            <div class="custom-dd-menu ${assetMenuOpen ? "is-open" : ""}" role="menu" data-dropdown-menu="1">
+              ${assetOptionsHtml}
+            </div>
           </div>
           <p class="stake-asset-note">${assetNote}</p>
-          <div class="select-row select-row--network" style="margin-top:0.65rem">
-            <span class="network-prefix">Lock</span>
-            <select data-field="stake-period" class="network-select">${periodOpts}</select>
-            ${chevronSvg()}
+          <div class="custom-dd-wrap" data-dropdown-wrap="1">
+            <div class="select-row select-row--network select-row--dd">
+              <span class="network-prefix">Lock</span>
+              <button type="button" class="custom-dd-trigger" data-action="stake-dd-period" aria-expanded="${periodMenuOpen}" aria-haspopup="menu">
+                <span class="custom-dd-value">${period.label}</span>
+                ${chevronSvg()}
+              </button>
+            </div>
+            <div class="custom-dd-menu ${periodMenuOpen ? "is-open" : ""}" role="menu" data-dropdown-menu="1">
+              ${periodOptionsHtml}
+            </div>
           </div>
           <div class="stake-apr-row">
             <span class="field-label" style="margin:0">APR</span>
@@ -1260,6 +1305,7 @@ function bind() {
       e.preventDefault();
       state.view = "bridge";
       state.productsOpen = false;
+      state.stakeDropdownOpen = null;
       render();
     });
   });
@@ -1269,6 +1315,7 @@ function bind() {
       e.preventDefault();
       state.view = "stake";
       state.productsOpen = false;
+      state.stakeDropdownOpen = null;
       if (state.stakeAsset === "evm_nat") {
         state.evmChainId = NAT_EVM_CHAIN_ID;
       }
@@ -1442,9 +1489,28 @@ function bind() {
     });
   });
 
-  document.querySelectorAll("[data-field='stake-asset']").forEach((el) => {
-    el.addEventListener("change", async (e) => {
-      state.stakeAsset = e.target.value === "brc20_nat" ? "brc20_nat" : "evm_nat";
+  document.querySelectorAll("[data-action='stake-dd-asset']").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.stakeDropdownOpen = state.stakeDropdownOpen === "asset" ? null : "asset";
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-action='stake-dd-period']").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.stakeDropdownOpen = state.stakeDropdownOpen === "period" ? null : "period";
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-stake-pick-asset]").forEach((el) => {
+    el.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const id = el.getAttribute("data-stake-pick-asset");
+      state.stakeAsset = id === "brc20_nat" ? "brc20_nat" : "evm_nat";
+      state.stakeDropdownOpen = null;
       if (state.stakeAsset === "evm_nat") {
         state.evmChainId = NAT_EVM_CHAIN_ID;
       }
@@ -1454,13 +1520,19 @@ function bind() {
     });
   });
 
-  document.querySelectorAll("[data-field='stake-period']").forEach((el) => {
-    el.addEventListener("change", (e) => {
-      state.stakePeriodId = e.target.value;
+  document.querySelectorAll("[data-stake-pick-period]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.stakePeriodId = el.getAttribute("data-stake-pick-period") || "1m";
+      state.stakeDropdownOpen = null;
       const rew = document.querySelector("[data-stake-reward]");
       if (rew) rew.textContent = stakeRewardEstimateText(state.stakeAmount, state.stakePeriodId);
       render();
     });
+  });
+
+  document.querySelectorAll("[data-dropdown-menu='1']").forEach((menu) => {
+    menu.addEventListener("click", (e) => e.stopPropagation());
   });
 
   document.querySelectorAll("[data-action='stake-submit']").forEach((el) => {
@@ -1468,11 +1540,26 @@ function bind() {
       try {
         await submitStake();
       } catch (err) {
+        if (isNeedTapWalletError(err)) {
+          showToast(TAP_WALLET_TOAST_ZH);
+          return;
+        }
         const msg =
           state.stakeAsset === "evm_nat" ? decodeEvmTxError(err) : err?.message || "Failed";
         showToast(msg);
       }
     });
+  });
+}
+
+let __stakeDdDocCloseBound = false;
+function ensureStakeDropdownDocClose() {
+  if (typeof document === "undefined" || __stakeDdDocCloseBound) return;
+  __stakeDdDocCloseBound = true;
+  document.addEventListener("click", () => {
+    if (state.view !== "stake" || !state.stakeDropdownOpen) return;
+    state.stakeDropdownOpen = null;
+    render();
   });
 }
 
@@ -1489,6 +1576,7 @@ window.addEventListener("tapprotocol#initialized", () => {
 
 ensureEip6963();
 requestEip6963Wallets();
+ensureStakeDropdownDocClose();
 
 render();
 refreshEthGas().then(() => render());

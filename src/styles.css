@@ -1,3 +1,8 @@
+/* 避免 Windows/Chrome 下原生控件弹出浅色列表、文字仍为浅色导致 option 看不见 */
+html {
+  color-scheme: dark;
+}
+
 :root {
   --bg: #000000;
   --card: #121212;
@@ -261,13 +266,19 @@ a {
 
 .select-row select {
   flex: 1;
-  background: transparent;
+  background-color: #141414;
   border: none;
   color: var(--text);
   font-size: 0.9rem;
   cursor: pointer;
   appearance: none;
   outline: none;
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #1e1e1e;
+  color: #f2f2f2;
 }
 
 .select-row--network {
@@ -314,7 +325,7 @@ select.network-select {
 }
 
 .token-select-wrap select {
-  background: rgba(0, 0, 0, 0.35);
+  background-color: #141414;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
   color: var(--muted);
@@ -322,6 +333,7 @@ select.network-select {
   font-size: 0.8rem;
   appearance: none;
   cursor: pointer;
+  color-scheme: dark;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239a9a9a' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.55rem center;
@@ -629,4 +641,99 @@ select.network-select {
   color: var(--muted);
   line-height: 1.45;
   margin-top: 0.65rem;
+}
+
+.mono--addr {
+  word-break: break-all;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.custom-dd-wrap {
+  position: relative;
+  margin-top: 0.65rem;
+}
+
+.select-row--dd {
+  cursor: default;
+}
+
+.custom-dd-trigger {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: right;
+  font-family: inherit;
+  padding: 0;
+}
+
+.custom-dd-trigger .chevron {
+  flex-shrink: 0;
+}
+
+.custom-dd-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.custom-dd-menu {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 40;
+  background: #1a1a1a;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 14px 48px rgba(0, 0, 0, 0.65);
+}
+
+.custom-dd-menu.is-open {
+  display: block;
+}
+
+.custom-dd-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  margin: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.custom-dd-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.custom-dd-option.is-active {
+  background: rgba(92, 31, 42, 0.55);
+  color: var(--text);
+}
+
+.modal-brc20-hint {
+  margin: 0.85rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--muted);
 }
