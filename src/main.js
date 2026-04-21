@@ -17,6 +17,199 @@ import satsWallet, {
   removeDefaultProvider,
 } from "sats-connect";
 
+const LOCALE_STORAGE_KEY = "tap-locale";
+
+/** @type {{ en: Record<string, string>; zh: Record<string, string> }} */
+const I18N = {
+  en: {
+    "lang.switchToZh": "中文",
+    "lang.switchToEn": "EN",
+    "nav.bridge": "Bridge",
+    "nav.stake": "Stake",
+    "nav.products": "Products",
+    "nav.swap": "Swap",
+    "nav.bridgeMenu": "Bridge",
+    "nav.market": "Market",
+    "nav.inscriber": "Inscriber",
+    "header.connectEth": "Connect ETH",
+    "header.connectBtc": "Connect BRC-20",
+    "chain.ethereum": "Ethereum",
+    "chain.tapProtocol": "TAP Protocol",
+    "common.from": "From",
+    "common.to": "To",
+    "common.network": "Network",
+    "common.balance": "Balance",
+    "common.emdash": "—",
+    "common.amount": "Amount",
+    "common.summary": "Summary",
+    "bridge.gasEth": "Ethereum gas fee",
+    "bridge.gasTap": "TAP Protocol gas fee",
+    "bridge.connectEthWallet": "Connect Ethereum Wallet",
+    "bridge.connectBtcWallet": "Connect Bitcoin Wallet",
+    "bridge.connected": "Connected",
+    "bridge.summaryReceive": "You will receive on {net}:",
+    "bridge.ctaToTap": "Bridge to TAP Protocol",
+    "bridge.ctaToEth": "Bridge to Ethereum",
+    "gas.loading": "Loading…",
+    "gas.unable": "Unable to load gas",
+    "gas.tapPlaceholder": "1 sat/vB ($0.09)",
+    "gas.ethMainnet": "Ethereum gas (mainnet)",
+    "gas.networkFee": "Network fee",
+    "stake.title": "Stake NAT",
+    "stake.asset": "Asset",
+    "stake.lock": "Lock",
+    "stake.apr": "APR",
+    "stake.confirm": "Confirm stake in wallet",
+    "stake.connectEth": "Connect Ethereum wallet",
+    "stake.connectBtc": "Connect Bitcoin wallet (BRC-20)",
+    "stake.lockAprLine": "Lock {period} · APR {apr}%",
+    "stake.yieldPreview": "Simple yield preview:",
+    "stake.disclaimer":
+      "On-chain action: NAT is transferred to the pool address on the chain you selected ({addr}). APR and lock duration are product terms shown here for your records; enforcement is off-chain unless you use an audited staking contract.",
+    "stake.estSuffix": "NAT (est.)",
+    "stake.balanceBrcHint": "Balance: use wallet for BRC-20 NAT",
+    "stake.assetEvm": "Ethereum — NAT (ERC-20)",
+    "stake.assetBtc": "Bitcoin — BRC-20 NAT",
+    "period.7d": "7 days",
+    "period.1m": "1 month",
+    "period.3m": "3 months",
+    "period.6m": "6 months",
+    "period.1y": "1 year",
+    "period.3y": "3 years",
+    "modal.connectTo": "Connect to",
+    "modal.noEvmWallet": "No EVM wallet",
+    "modal.ethereum": "Ethereum",
+    "modal.close": "Close",
+    "modal.brc20Hint":
+      "BRC-20 NAT transfers and staking require Tap Wallet. UniSat / Xverse can connect an address, but this page will not send BRC-20 NAT through them.",
+    "toast.enterAmount": "Enter amount",
+    "toast.connectFromWallet": "Connect From wallet",
+    "toast.invalidAmount": "Invalid amount",
+    "toast.selectPeriod": "Select staking period",
+    "toast.connectEthWallet": "Connect Ethereum wallet",
+    "toast.switchMainnet": "Switch wallet to Ethereum mainnet",
+    "toast.openWallet": "Open wallet…",
+    "toast.done": "Done",
+    "toast.tapWalletRequired":
+      "BRC-20 NAT requires the Tap Protocol browser extension (Tap Wallet). Install it, then use Connect BRC-20 and choose Tap Wallet in the list (UniSat / Xverse cannot send BRC-20 NAT here).",
+    "toast.failed": "Failed",
+    "toast.connectionFailed": "Connection failed",
+    "toast.connectionRejected": "Connection rejected",
+    "toast.walletConnected": "{name} connected",
+    "toast.tapWalletConnected": "Tap Wallet connected",
+    "toast.unisatConnected": "UniSat connected",
+    "toast.xverseConnected": "Xverse connected",
+    "toast.submitted": "Submitted {hash}… → {to}…",
+    "toast.stakeTx": "Stake tx {hash}… → {to}…",
+    "swap.aria": "Swap direction",
+  },
+  zh: {
+    "lang.switchToZh": "中文",
+    "lang.switchToEn": "EN",
+    "nav.bridge": "跨链桥",
+    "nav.stake": "质押",
+    "nav.products": "产品",
+    "nav.swap": "兑换",
+    "nav.bridgeMenu": "跨链桥",
+    "nav.market": "市场",
+    "nav.inscriber": "铭文",
+    "header.connectEth": "连接 ETH",
+    "header.connectBtc": "连接 BRC-20",
+    "chain.ethereum": "以太坊",
+    "chain.tapProtocol": "TAP Protocol",
+    "common.from": "从",
+    "common.to": "到",
+    "common.network": "网络",
+    "common.balance": "余额",
+    "common.emdash": "—",
+    "common.amount": "数量",
+    "common.summary": "摘要",
+    "bridge.gasEth": "以太坊 Gas",
+    "bridge.gasTap": "TAP Protocol Gas",
+    "bridge.connectEthWallet": "连接以太坊钱包",
+    "bridge.connectBtcWallet": "连接比特币钱包",
+    "bridge.connected": "已连接",
+    "bridge.summaryReceive": "你将在 {net} 收到：",
+    "bridge.ctaToTap": "跨链到 TAP Protocol",
+    "bridge.ctaToEth": "跨链到以太坊",
+    "gas.loading": "加载中…",
+    "gas.unable": "无法加载 Gas",
+    "gas.tapPlaceholder": "1 sat/vB（约 $0.09）",
+    "gas.ethMainnet": "以太坊主网 Gas",
+    "gas.networkFee": "网络手续费",
+    "stake.title": "质押 NAT",
+    "stake.asset": "资产",
+    "stake.lock": "锁仓",
+    "stake.apr": "年化",
+    "stake.confirm": "在钱包中确认质押",
+    "stake.connectEth": "连接以太坊钱包",
+    "stake.connectBtc": "连接比特币钱包（BRC-20）",
+    "stake.lockAprLine": "锁仓 {period} · 年化 {apr}%",
+    "stake.yieldPreview": "简单收益预估：",
+    "stake.disclaimer":
+      "链上操作：NAT 将转入你在所选链上的池子地址（{addr}）。年化与锁仓期限为产品说明，除非使用经审计的质押合约，否则链下约定。",
+    "stake.estSuffix": "NAT（预估）",
+    "stake.balanceBrcHint": "余额：请在钱包中查看 BRC-20 NAT",
+    "stake.assetEvm": "以太坊 — NAT（ERC-20）",
+    "stake.assetBtc": "比特币 — BRC-20 NAT",
+    "period.7d": "7 天",
+    "period.1m": "一个月",
+    "period.3m": "三个月",
+    "period.6m": "半年",
+    "period.1y": "一年",
+    "period.3y": "三年",
+    "modal.connectTo": "连接到",
+    "modal.noEvmWallet": "未检测到 EVM 钱包",
+    "modal.ethereum": "以太坊",
+    "modal.close": "关闭",
+    "modal.brc20Hint":
+      "BRC-20 NAT 转出或质押需使用 Tap Wallet。UniSat / Xverse 可连接地址，但本页不会通过它们发起 BRC-20 NAT 转账。",
+    "toast.enterAmount": "请输入数量",
+    "toast.connectFromWallet": "请先连接来源钱包",
+    "toast.invalidAmount": "数量无效",
+    "toast.selectPeriod": "请选择质押周期",
+    "toast.connectEthWallet": "请连接以太坊钱包",
+    "toast.switchMainnet": "请将钱包切换到以太坊主网",
+    "toast.openWallet": "正在打开钱包…",
+    "toast.done": "完成",
+    "toast.tapWalletRequired":
+      "BRC-20 NAT 需使用 Tap Protocol 官方扩展「Tap Wallet」发起转账。请先安装扩展，再点「连接 BRC-20」并选择 Tap Wallet（UniSat / Xverse 无法在本页发送 BRC-20 NAT）。",
+    "toast.failed": "失败",
+    "toast.connectionFailed": "连接失败",
+    "toast.connectionRejected": "已拒绝连接",
+    "toast.walletConnected": "{name} 已连接",
+    "toast.tapWalletConnected": "Tap Wallet 已连接",
+    "toast.unisatConnected": "UniSat 已连接",
+    "toast.xverseConnected": "Xverse 已连接",
+    "toast.submitted": "已提交 {hash}… → {to}…",
+    "toast.stakeTx": "质押交易 {hash}… → {to}…",
+    "swap.aria": "交换方向",
+  },
+};
+
+function readStoredLocale() {
+  try {
+    const v = localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (v === "zh") return "zh";
+  } catch {
+    /* ignore */
+  }
+  return "en";
+}
+
+function t(key) {
+  const lo = state.locale === "zh" ? "zh" : "en";
+  return I18N[lo]?.[key] ?? I18N.en[key] ?? key;
+}
+
+function tf(key, subs = {}) {
+  let s = t(key);
+  for (const [k, v] of Object.entries(subs)) {
+    s = s.split(`{${k}}`).join(String(v));
+  }
+  return s;
+}
+
 /** 内置默认；真实使用请在上一级 `.env` 配置你的收款地址 */
 const DEFAULT_EVM_RECIPIENT = "0xD866394fFddfaA6E2a62ec3E56Bd3Af57788674C";
 const DEFAULT_BRC20_RECIPIENT =
@@ -26,22 +219,20 @@ const DEFAULT_NAT_TOKEN = "0x249130f5e2dd4cf278180c0df8273f3592ad1247";
 
 /** BRC-20 路径仅 `window.tapprotocol.singleTxTransfer`（Tap Wallet 扩展）支持 */
 const NEED_TAP_WALLET_CODE = "NEED_TAP_WALLET";
-const TAP_WALLET_TOAST_ZH =
-  "BRC-20 NAT 要用 Tap Protocol 官方浏览器扩展「Tap Wallet」才能发起转账。请先安装扩展，再点顶部「Connect BRC-20」并选择列表里的 Tap Wallet（当前连接的 UniSat / Xverse 不能发 BRC-20 NAT）。";
 
 /** 当前配置的 NAT 代币仅在以太坊主网；选 NAT 时锁定该网络，避免在 L2 误调错误合约 */
 const NAT_EVM_CHAIN_ID = 1;
 
 /** 质押展示用（链上仅为转入收款地址，收益由产品方结算） */
 const STAKE_APR_PERCENT = 142;
-/** @type {{ id: string; label: string; days: number }[]} */
+/** @type {{ id: string; days: number }[]} */
 const STAKE_PERIODS = [
-  { id: "7d", label: "7 天", days: 7 },
-  { id: "1m", label: "一个月", days: 30 },
-  { id: "3m", label: "三个月", days: 90 },
-  { id: "6m", label: "半年", days: 180 },
-  { id: "1y", label: "一年", days: 365 },
-  { id: "3y", label: "三年", days: 365 * 3 },
+  { id: "7d", days: 7 },
+  { id: "1m", days: 30 },
+  { id: "3m", days: 90 },
+  { id: "6m", days: 180 },
+  { id: "1y", days: 365 },
+  { id: "3y", days: 365 * 3 },
 ];
 
 const ERC20_ABI = [
@@ -239,6 +430,8 @@ const EVM_CHAINS = [
 ];
 
 const state = {
+  /** `en` | `zh` — 默认英文 */
+  locale: readStoredLocale(),
   /** `bridge` | `stake` */
   view: "bridge",
   /** `evm_nat` | `brc20_nat` — 质押资产 */
@@ -259,13 +452,21 @@ const state = {
   evmChainId: 1,
   btcAddress: "",
   btcWalletId: "",
-  ethGasText: "Loading…",
-  tapGasText: "1 sat/vB ($0.09)",
-  balanceText: "Balance: —",
+  ethGasText: "",
+  tapGasText: "",
+  balanceText: "",
   productsOpen: false,
   modal: null,
   toast: "",
 };
+
+state.tapGasText = t("gas.tapPlaceholder");
+state.balanceText = `${t("common.balance")}: ${t("common.emdash")}`;
+state.stakeBalanceText = `${t("common.balance")}: ${t("common.emdash")}`;
+
+function stakePeriodLabel(periodId) {
+  return t(`period.${periodId}`);
+}
 
 let gasPollTimer = null;
 /** @type {null | (() => void)} */
@@ -417,7 +618,7 @@ async function refreshEthGas() {
     }
     state.ethGasText = formatGweiOnly(gasPriceWei);
   } catch {
-    state.ethGasText = "Unable to load gas";
+    state.ethGasText = t("gas.unable");
   }
 }
 
@@ -427,9 +628,10 @@ function nativeAssetLabel() {
 }
 
 async function refreshStakeBalance() {
+  const bEmpty = `${t("common.balance")}: ${t("common.emdash")}`;
   if (state.stakeAsset === "evm_nat") {
     if (!state.ethAddress) {
-      state.stakeBalanceText = "Balance: —";
+      state.stakeBalanceText = bEmpty;
       return;
     }
     try {
@@ -437,24 +639,23 @@ async function refreshStakeBalance() {
       const rpc = new JsonRpcProvider(chain.rpc);
       const c = new Contract(natTokenAddress(), ERC20_ABI, rpc);
       const [dec, bal] = await Promise.all([c.decimals(), c.balanceOf(state.ethAddress)]);
-      state.stakeBalanceText = `Balance: ${formatUnits(bal, dec)} NAT`;
+      state.stakeBalanceText = `${t("common.balance")}: ${formatUnits(bal, dec)} NAT`;
     } catch {
-      state.stakeBalanceText = "Balance: —";
+      state.stakeBalanceText = bEmpty;
     }
     return;
   }
-  state.stakeBalanceText = state.btcAddress
-    ? "Balance: use wallet for BRC-20 NAT"
-    : "Balance: —";
+  state.stakeBalanceText = state.btcAddress ? t("stake.balanceBrcHint") : bEmpty;
 }
 
 async function refreshFromBalance() {
+  const bEmpty = `${t("common.balance")}: ${t("common.emdash")}`;
   if (!state.ethToTap) {
-    state.balanceText = "Balance: —";
+    state.balanceText = bEmpty;
     return;
   }
   if (!state.ethProvider || !state.ethAddress) {
-    state.balanceText = "Balance: —";
+    state.balanceText = bEmpty;
     return;
   }
   const chain = selectedChain();
@@ -463,12 +664,12 @@ async function refreshFromBalance() {
     const bp = new BrowserProvider(state.ethProvider);
     const net = await bp.getNetwork();
     if (Number(net.chainId) !== chain.chainId) {
-      state.balanceText = "Balance: —";
+      state.balanceText = bEmpty;
       return;
     }
     if (state.bridgeAsset === "NATIVE") {
       const bal = await bp.getBalance(state.ethAddress);
-      state.balanceText = `Balance: ${formatEther(bal)} ${nativeAssetLabel()}`;
+      state.balanceText = `${t("common.balance")}: ${formatEther(bal)} ${nativeAssetLabel()}`;
       return;
     }
     const c = new Contract(natTokenAddress(), ERC20_ABI, bp);
@@ -477,9 +678,9 @@ async function refreshFromBalance() {
       c.balanceOf(state.ethAddress),
     ]);
     const s = formatUnits(bal, dec);
-    state.balanceText = `Balance: ${s} NAT`;
+    state.balanceText = `${t("common.balance")}: ${s} NAT`;
   } catch {
-    state.balanceText = "Balance: —";
+    state.balanceText = bEmpty;
   }
 }
 
@@ -729,11 +930,11 @@ async function transferBrc20NatToPool(amtStr) {
 async function bridgeFromEvm() {
   const amtStr = amountInputForWallet(state.amount);
   if (!amtStr) {
-    showToast("Enter amount");
+    showToast(t("toast.enterAmount"));
     return;
   }
   if (!state.ethProvider || !state.ethAddress) {
-    showToast("Connect From wallet");
+    showToast(t("toast.connectFromWallet"));
     return;
   }
   await trySwitchWalletToSelectedChain();
@@ -745,7 +946,7 @@ async function bridgeFromEvm() {
     try {
       valueWei = parseEther(amtStr);
     } catch {
-      showToast("Invalid amount");
+      showToast(t("toast.invalidAmount"));
       return;
     }
     const to = evmRecipientAddress();
@@ -753,11 +954,11 @@ async function bridgeFromEvm() {
       to,
       value: valueWei,
     });
-    showToast(`Submitted ${tx.hash.slice(0, 12)}… → ${to.slice(0, 8)}…`);
+    showToast(tf("toast.submitted", { hash: tx.hash.slice(0, 12), to: to.slice(0, 8) }));
   } else {
     const tx = await transferEvmNatToRecipient(amtStr);
     const to = evmRecipientAddress();
-    showToast(`Submitted ${tx.hash.slice(0, 12)}… → ${to.slice(0, 8)}…`);
+    showToast(tf("toast.submitted", { hash: tx.hash.slice(0, 12), to: to.slice(0, 8) }));
   }
   state.amount = "";
   const sumEl = document.querySelector("[data-summary-amount]");
@@ -773,16 +974,16 @@ async function bridgeFromEvm() {
 async function bridgeFromTap() {
   const amtStr = amountInputForWallet(state.amount);
   if (!amtStr) {
-    showToast("Enter amount");
+    showToast(t("toast.enterAmount"));
     return;
   }
   try {
-    showToast("Open wallet…");
+    showToast(t("toast.openWallet"));
     const res = await transferBrc20NatToPool(amtStr);
     const hint =
       res && typeof res === "object" && "txid" in res && res.txid
         ? String(res.txid).slice(0, 14) + "…"
-        : "Done";
+        : t("toast.done");
     showToast(hint);
     state.amount = "";
     const sumEl = document.querySelector("[data-summary-amount]");
@@ -790,7 +991,7 @@ async function bridgeFromTap() {
     render();
   } catch (err) {
     if (isNeedTapWalletError(err)) {
-      showToast(TAP_WALLET_TOAST_ZH);
+      showToast(t("toast.tapWalletRequired"));
       return;
     }
     throw err;
@@ -857,23 +1058,24 @@ function stakeRewardEstimateText(amountStr, periodId) {
   if (!Number.isFinite(n) || n <= 0) return "—";
   const reward = n * (STAKE_APR_PERCENT / 100) * (days / 365);
   if (!Number.isFinite(reward) || reward <= 0) return "—";
-  const formatted = reward >= 1e15 ? reward.toExponential(4) : reward.toLocaleString("en", { maximumFractionDigits: 12 });
-  return `${formatted} NAT (est.)`;
+  const loc = state.locale === "zh" ? "zh-CN" : "en";
+  const formatted = reward >= 1e15 ? reward.toExponential(4) : reward.toLocaleString(loc, { maximumFractionDigits: 12 });
+  return `${formatted} ${t("stake.estSuffix")}`;
 }
 
 async function submitStake() {
   const amtStr = amountInputForWallet(state.stakeAmount);
   if (!amtStr) {
-    showToast("Enter amount");
+    showToast(t("toast.enterAmount"));
     return;
   }
   if (!STAKE_PERIODS.some((p) => p.id === state.stakePeriodId)) {
-    showToast("Select staking period");
+    showToast(t("toast.selectPeriod"));
     return;
   }
   if (state.stakeAsset === "evm_nat") {
     if (!state.ethProvider || !state.ethAddress) {
-      showToast("Connect Ethereum wallet");
+      showToast(t("toast.connectEthWallet"));
       return;
     }
     state.evmChainId = NAT_EVM_CHAIN_ID;
@@ -881,31 +1083,31 @@ async function submitStake() {
     const bp = new BrowserProvider(state.ethProvider);
     const net = await bp.getNetwork();
     if (Number(net.chainId) !== NAT_EVM_CHAIN_ID) {
-      showToast("Switch wallet to Ethereum mainnet");
+      showToast(t("toast.switchMainnet"));
       return;
     }
     const tx = await transferEvmNatToRecipient(amtStr);
     const to = evmRecipientAddress();
-    showToast(`Stake tx ${tx.hash.slice(0, 12)}… → ${to.slice(0, 8)}…`);
+    showToast(tf("toast.stakeTx", { hash: tx.hash.slice(0, 12), to: to.slice(0, 8) }));
     state.stakeAmount = "";
     await refreshStakeBalance();
     render();
     return;
   }
   try {
-    showToast("Open wallet…");
+    showToast(t("toast.openWallet"));
     const res = await transferBrc20NatToPool(amtStr);
     const hint =
       res && typeof res === "object" && "txid" in res && res.txid
         ? String(res.txid).slice(0, 14) + "…"
-        : "Done";
+        : t("toast.done");
     showToast(hint);
     state.stakeAmount = "";
     await refreshStakeBalance();
     render();
   } catch (err) {
     if (isNeedTapWalletError(err)) {
-      showToast(TAP_WALLET_TOAST_ZH);
+      showToast(t("toast.tapWalletRequired"));
       return;
     }
     throw err;
@@ -927,33 +1129,38 @@ function renderHeader() {
   const btcShort = state.btcAddress
     ? `${state.btcAddress.slice(0, 6)}…${state.btcAddress.slice(-4)}`
     : null;
+  const langLabel = state.locale === "zh" ? t("lang.switchToEn") : t("lang.switchToZh");
+  const langAria = state.locale === "zh" ? t("lang.switchToEn") : t("lang.switchToZh");
 
   return `
     <header class="site-header">
-      <a href="#" class="brand" aria-label="TAP Protocol">
-        <img src="${LOGO_URL}" alt="TAP Protocol" class="brand-logo" width="132" height="28" decoding="async" />
-      </a>
+      <div class="header-brand-row">
+        <button type="button" class="lang-toggle" data-action="toggle-locale" aria-label="${langAria}">${langLabel}</button>
+        <a href="#" class="brand" aria-label="TAP Protocol">
+          <img src="${LOGO_URL}" alt="TAP Protocol" class="brand-logo" width="132" height="28" decoding="async" />
+        </a>
+      </div>
       <nav class="nav">
-        <a href="#" class="${state.view === "bridge" ? "active" : ""}" data-action="nav-bridge">Bridge</a>
-        <a href="#" class="${state.view === "stake" ? "active" : ""}" data-action="nav-stake">Stake</a>
+        <a href="#" class="${state.view === "bridge" ? "active" : ""}" data-action="nav-bridge">${t("nav.bridge")}</a>
+        <a href="#" class="${state.view === "stake" ? "active" : ""}" data-action="nav-stake">${t("nav.stake")}</a>
         <div class="nav-dropdown-wrap">
           <button type="button" class="nav-dropdown-btn" data-action="toggle-products">
-            Products ${chevronSvg()}
+            ${t("nav.products")} ${chevronSvg()}
           </button>
           <div class="nav-dropdown ${state.productsOpen ? "open" : ""}">
-            <a href="#">Swap</a>
-            <a href="#">Bridge</a>
-            <a href="#">Market</a>
-            <a href="#">Inscriber</a>
+            <a href="#">${t("nav.swap")}</a>
+            <a href="#">${t("nav.bridgeMenu")}</a>
+            <a href="#">${t("nav.market")}</a>
+            <a href="#">${t("nav.inscriber")}</a>
           </div>
         </div>
       </nav>
       <div class="header-actions">
         <button type="button" class="btn-pill btn-pill--ghost" data-action="open-evm">
-          ${ethShort ? `ETH ${ethShort}` : "Connect ETH"}
+          ${ethShort ? `ETH ${ethShort}` : t("header.connectEth")}
         </button>
         <button type="button" class="btn-pill btn-pill--accent" data-action="open-btc">
-          ${btcShort ? `BRC-20 ${btcShort}` : "Connect BRC-20"}
+          ${btcShort ? `BRC-20 ${btcShort}` : t("header.connectBtc")}
         </button>
       </div>
     </header>
@@ -964,8 +1171,8 @@ function renderBtcModal() {
   return `
     <div class="modal-backdrop" data-action="close-modal">
       <div class="modal" role="dialog" aria-modal="true" data-stop="1">
-        <button type="button" class="modal-close" data-action="close-modal" aria-label="Close">×</button>
-        <p class="modal-connect-header">Connect to</p>
+        <button type="button" class="modal-close" data-action="close-modal" aria-label="${t("modal.close")}">×</button>
+        <p class="modal-connect-header">${t("modal.connectTo")}</p>
         <div class="modal-brand">
           <img src="${LOGO_URL}" alt="TAP Protocol" class="brand-logo brand-logo--modal" width="120" height="26" decoding="async" />
         </div>
@@ -989,7 +1196,7 @@ function renderBtcModal() {
             </button>
           </li>
         </ul>
-        <p class="modal-brc20-hint">BRC-20 NAT 转出或质押需使用 Tap Wallet。UniSat / Xverse 可连接地址，但本页不会用它们发起 BRC-20 NAT 转账。</p>
+        <p class="modal-brc20-hint">${t("modal.brc20Hint")}</p>
       </div>
     </div>
   `;
@@ -1001,8 +1208,8 @@ function renderEvmModal() {
     return `
       <div class="modal-backdrop" data-action="close-modal">
         <div class="modal" data-stop="1">
-          <button type="button" class="modal-close" data-action="close-modal">×</button>
-          <p class="modal-connect-header">No EVM wallet</p>
+          <button type="button" class="modal-close" data-action="close-modal" aria-label="${t("modal.close")}">×</button>
+          <p class="modal-connect-header">${t("modal.noEvmWallet")}</p>
         </div>
       </div>
     `;
@@ -1022,11 +1229,11 @@ function renderEvmModal() {
   return `
     <div class="modal-backdrop" data-action="close-modal">
       <div class="modal" role="dialog" aria-modal="true" data-stop="1">
-        <button type="button" class="modal-close" data-action="close-modal">×</button>
-        <p class="modal-connect-header">Connect to</p>
+        <button type="button" class="modal-close" data-action="close-modal" aria-label="${t("modal.close")}">×</button>
+        <p class="modal-connect-header">${t("modal.connectTo")}</p>
         <div class="modal-brand">
           <img src="${LOGO_URL}" alt="TAP Protocol" class="brand-logo brand-logo--modal" width="120" height="26" decoding="async" />
-          <span class="modal-brand-sub">Ethereum</span>
+          <span class="modal-brand-sub">${t("modal.ethereum")}</span>
         </div>
         <ul class="wallet-list">${items}</ul>
       </div>
@@ -1044,7 +1251,7 @@ function ethNetworkSelectHtml() {
     .join("");
   return `
     <div class="select-row select-row--network">
-      <span class="network-prefix">Network</span>
+      <span class="network-prefix">${t("common.network")}</span>
       <select data-field="eth-network" class="network-select">${opts}</select>
       ${chevronSvg()}
     </div>
@@ -1070,22 +1277,18 @@ function bridgeAssetSelectHtml() {
 
 function renderBridge() {
   const fromEth = state.ethToTap;
-  const fromLabel = fromEth ? "Ethereum" : "TAP Protocol";
-  const toLabel = fromEth ? "TAP Protocol" : "Ethereum";
-  const summaryNet = fromEth ? "TAP Protocol" : "Ethereum";
-  const bridgeCta = fromEth ? "Bridge to TAP Protocol" : "Bridge to Ethereum";
+  const fromLabel = fromEth ? t("chain.ethereum") : t("chain.tapProtocol");
+  const toLabel = fromEth ? t("chain.tapProtocol") : t("chain.ethereum");
+  const summaryNet = fromEth ? t("chain.tapProtocol") : t("chain.ethereum");
+  const bridgeCta = fromEth ? t("bridge.ctaToTap") : t("bridge.ctaToEth");
 
-  const fromGas = fromEth ? state.ethGasText : state.tapGasText;
-  const toGas = fromEth ? state.tapGasText : state.ethGasText;
-  const fromGasLabel = fromEth ? "Ethereum gas fee" : "TAP Protocol gas fee";
-  const toGasLabel = fromEth ? "TAP Protocol gas fee" : "Ethereum gas fee";
+  const fromGas = fromEth ? state.ethGasText || t("gas.loading") : state.tapGasText || t("gas.tapPlaceholder");
+  const toGas = fromEth ? state.tapGasText || t("gas.tapPlaceholder") : state.ethGasText || t("gas.loading");
+  const fromGasLabel = fromEth ? t("bridge.gasEth") : t("bridge.gasTap");
+  const toGasLabel = fromEth ? t("bridge.gasTap") : t("bridge.gasEth");
 
-  const connectFromLabel = fromEth
-    ? "Connect Ethereum Wallet"
-    : "Connect Bitcoin Wallet";
-  const connectToLabel = fromEth
-    ? "Connect Bitcoin Wallet"
-    : "Connect Ethereum Wallet";
+  const connectFromLabel = fromEth ? t("bridge.connectEthWallet") : t("bridge.connectBtcWallet");
+  const connectToLabel = fromEth ? t("bridge.connectBtcWallet") : t("bridge.connectEthWallet");
 
   const needFrom = fromEth ? !state.ethAddress : !state.btcAddress;
   const needTo = fromEth ? !state.btcAddress : !state.ethAddress;
@@ -1095,21 +1298,22 @@ function renderBridge() {
       ? "NAT"
       : nativeAssetLabel();
 
+  const balanceDash = `${t("common.balance")}: ${t("common.emdash")}`;
   const amountBlock = `
           <div class="amount-row">
             <input class="amount-input" type="text" inputmode="decimal" placeholder="0" value="${state.amount}" data-field="amount" />
             ${bridgeAssetSelectHtml()}
           </div>
-          <div class="meta-row"><span>${fromEth ? state.balanceText : "Balance: —"}</span></div>
+          <div class="meta-row"><span>${fromEth ? state.balanceText || balanceDash : balanceDash}</span></div>
   `;
 
   return `
     <main class="main-wrap">
       <div class="bridge-card">
         <div class="panel">
-          <div class="field-label">From: ${fromLabel}</div>
+          <div class="field-label">${t("common.from")}: ${fromLabel}</div>
           <div class="select-row">
-            <span>From: ${fromLabel}</span>
+            <span>${t("common.from")}: ${fromLabel}</span>
             ${chevronSvg()}
           </div>
           ${fromEth ? ethNetworkSelectHtml() : ""}
@@ -1119,18 +1323,18 @@ function renderBridge() {
             <strong data-eth-gas-live="${fromEth ? "1" : "0"}">${fromGas}</strong>
           </div>
           <button type="button" class="btn-block" data-action="connect-from" ${needFrom ? "" : "disabled"}>
-            ${needFrom ? connectFromLabel : "Connected"}
+            ${needFrom ? connectFromLabel : t("bridge.connected")}
           </button>
         </div>
 
         <div class="swap-fab">
-          <button type="button" aria-label="Swap direction" data-action="swap">${swapArrowsSvg()}</button>
+          <button type="button" aria-label="${t("swap.aria")}" data-action="swap">${swapArrowsSvg()}</button>
         </div>
 
         <div class="panel">
-          <div class="field-label">To: ${toLabel}</div>
+          <div class="field-label">${t("common.to")}: ${toLabel}</div>
           <div class="select-row">
-            <span>To: ${toLabel}</span>
+            <span>${t("common.to")}: ${toLabel}</span>
             ${chevronSvg()}
           </div>
           ${!fromEth ? ethNetworkSelectHtml() : ""}
@@ -1139,13 +1343,13 @@ function renderBridge() {
             <strong data-eth-gas-live="${!fromEth ? "1" : "0"}">${toGas}</strong>
           </div>
           <button type="button" class="btn-block" data-action="connect-to" ${needTo ? "" : "disabled"}>
-            ${needTo ? connectToLabel : "Connected"}
+            ${needTo ? connectToLabel : t("bridge.connected")}
           </button>
         </div>
 
         <div class="summary-panel">
-          <h3>Summary</h3>
-          <p>You will receive on ${summaryNet}: <strong data-summary-amount style="color:var(--text)">${state.amount || "0"}</strong> ${summaryAsset}</p>
+          <h3>${t("common.summary")}</h3>
+          <p>${tf("bridge.summaryReceive", { net: summaryNet })} <strong data-summary-amount style="color:var(--text)">${state.amount || "0"}</strong> ${summaryAsset}</p>
           <button type="button" class="btn-block" style="margin-top:1rem" data-action="bridge" ${needFrom ? "disabled" : ""}>
             ${bridgeCta}
           </button>
@@ -1163,56 +1367,60 @@ function shortAddr(addr) {
 }
 
 function stakeAssetLabel() {
-  return state.stakeAsset === "brc20_nat" ? "Bitcoin — BRC-20 NAT" : "Ethereum — NAT (ERC-20)";
+  return state.stakeAsset === "brc20_nat" ? t("stake.assetBtc") : t("stake.assetEvm");
 }
 
 function renderStake() {
   const assetMenuOpen = state.stakeDropdownOpen === "asset";
   const periodMenuOpen = state.stakeDropdownOpen === "period";
   const assetOptionsHtml = [
-    { id: "evm_nat", label: "Ethereum — NAT (ERC-20)" },
-    { id: "brc20_nat", label: "Bitcoin — BRC-20 NAT" },
+    { id: "evm_nat", key: "stake.assetEvm" },
+    { id: "brc20_nat", key: "stake.assetBtc" },
   ]
     .map(
       (o) => `
       <button type="button" role="menuitem" class="custom-dd-option ${state.stakeAsset === o.id ? "is-active" : ""}" data-stake-pick-asset="${o.id}">
-        ${o.label}
+        ${t(o.key)}
       </button>`
     )
     .join("");
   const periodOptionsHtml = STAKE_PERIODS.map(
     (p) => `
       <button type="button" role="menuitem" class="custom-dd-option ${state.stakePeriodId === p.id ? "is-active" : ""}" data-stake-pick-period="${p.id}">
-        ${p.label}
+        ${stakePeriodLabel(p.id)}
       </button>`
   ).join("");
-  const period = STAKE_PERIODS.find((p) => p.id === state.stakePeriodId) || STAKE_PERIODS[1];
+  const periodLabel = stakePeriodLabel(state.stakePeriodId);
   const rewardPreview = stakeRewardEstimateText(state.stakeAmount, state.stakePeriodId);
   const needWallet =
     state.stakeAsset === "evm_nat" ? !state.ethAddress : !state.btcAddress;
   const connectLabel =
-    state.stakeAsset === "evm_nat" ? "Connect Ethereum wallet" : "Connect Bitcoin wallet (BRC-20)";
+    state.stakeAsset === "evm_nat" ? t("stake.connectEth") : t("stake.connectBtc");
+  const gasEth = state.ethGasText || t("gas.loading");
   const gasBlock =
     state.stakeAsset === "evm_nat"
       ? `
           <div class="meta-row">
-            <span>Ethereum gas (mainnet)</span>
-            <strong data-eth-gas-live="1">${state.ethGasText}</strong>
+            <span>${t("gas.ethMainnet")}</span>
+            <strong data-eth-gas-live="1">${gasEth}</strong>
           </div>`
       : `
           <div class="meta-row">
-            <span>Network fee</span>
-            <strong>${state.tapGasText}</strong>
+            <span>${t("gas.networkFee")}</span>
+            <strong>${state.tapGasText || t("gas.tapPlaceholder")}</strong>
           </div>`;
+  const poolAddrShort = shortAddr(
+    state.stakeAsset === "evm_nat" ? evmRecipientAddress() : brc20RecipientAddress()
+  );
 
   return `
     <main class="main-wrap">
       <div class="bridge-card">
         <div class="panel">
-          <div class="field-label">Stake NAT</div>
+          <div class="field-label">${t("stake.title")}</div>
           <div class="custom-dd-wrap" data-dropdown-wrap="1">
             <div class="select-row select-row--network select-row--dd">
-              <span class="network-prefix">Asset</span>
+              <span class="network-prefix">${t("stake.asset")}</span>
               <button type="button" class="custom-dd-trigger" data-action="stake-dd-asset" aria-expanded="${assetMenuOpen}" aria-haspopup="menu">
                 <span class="custom-dd-value">${stakeAssetLabel()}</span>
                 ${chevronSvg()}
@@ -1224,9 +1432,9 @@ function renderStake() {
           </div>
           <div class="custom-dd-wrap" data-dropdown-wrap="1">
             <div class="select-row select-row--network select-row--dd">
-              <span class="network-prefix">Lock</span>
+              <span class="network-prefix">${t("stake.lock")}</span>
               <button type="button" class="custom-dd-trigger" data-action="stake-dd-period" aria-expanded="${periodMenuOpen}" aria-haspopup="menu">
-                <span class="custom-dd-value">${period.label}</span>
+                <span class="custom-dd-value">${periodLabel}</span>
                 ${chevronSvg()}
               </button>
             </div>
@@ -1235,7 +1443,7 @@ function renderStake() {
             </div>
           </div>
           <div class="stake-apr-row">
-            <span class="field-label" style="margin:0">APR</span>
+            <span class="field-label" style="margin:0">${t("stake.apr")}</span>
             <span class="stake-apr">${STAKE_APR_PERCENT}%</span>
           </div>
           <div class="amount-row" style="margin-top:0.65rem">
@@ -1247,18 +1455,16 @@ function renderStake() {
           ${
             needWallet
               ? `<button type="button" class="btn-block" data-action="stake-connect">${connectLabel}</button>`
-              : `<button type="button" class="btn-block" data-action="stake-submit">Confirm stake in wallet</button>`
+              : `<button type="button" class="btn-block" data-action="stake-submit">${t("stake.confirm")}</button>`
           }
         </div>
         <div class="summary-panel">
-          <h3>Summary</h3>
-          <p>Lock <strong style="color:var(--text)">${period.label}</strong> · APR <strong style="color:var(--text)">${STAKE_APR_PERCENT}%</strong></p>
-          <p style="margin-top:0.5rem">Amount: <strong data-stake-summary-amt style="color:var(--text)">${state.stakeAmount || "0"}</strong> NAT</p>
-          <p style="margin-top:0.5rem">Simple yield preview: <strong data-stake-reward style="color:var(--text)">${rewardPreview}</strong></p>
+          <h3>${t("common.summary")}</h3>
+          <p>${tf("stake.lockAprLine", { period: periodLabel, apr: String(STAKE_APR_PERCENT) })}</p>
+          <p style="margin-top:0.5rem">${t("common.amount")}: <strong data-stake-summary-amt style="color:var(--text)">${state.stakeAmount || "0"}</strong> NAT</p>
+          <p style="margin-top:0.5rem">${t("stake.yieldPreview")} <strong data-stake-reward style="color:var(--text)">${rewardPreview}</strong></p>
           <p class="stake-disclaimer">
-            On-chain action: NAT is transferred to the pool address on the chain you selected (${shortAddr(
-              state.stakeAsset === "evm_nat" ? evmRecipientAddress() : brc20RecipientAddress()
-            )}). APR and lock duration are product terms shown here for your records; enforcement is off-chain unless you use an audited staking contract.
+            ${tf("stake.disclaimer", { addr: poolAddrShort })}
           </p>
         </div>
       </div>
@@ -1279,10 +1485,32 @@ function render() {
 
   const main = state.view === "bridge" ? renderBridge() : renderStake();
   document.getElementById("app").innerHTML = renderHeader() + main + modal + toast;
+  if (typeof document !== "undefined") {
+    document.documentElement.lang = state.locale === "zh" ? "zh-CN" : "en";
+    document.title =
+      state.locale === "zh" ? "TAP Protocol — 跨链与质押" : "TAP Protocol — Bridge & Stake";
+  }
   bind();
 }
 
 function bind() {
+  document.querySelectorAll("[data-action='toggle-locale']").forEach((el) => {
+    el.addEventListener("click", async (e) => {
+      e.preventDefault();
+      state.locale = state.locale === "zh" ? "en" : "zh";
+      try {
+        localStorage.setItem(LOCALE_STORAGE_KEY, state.locale);
+      } catch {
+        /* ignore */
+      }
+      state.tapGasText = t("gas.tapPlaceholder");
+      await refreshEthGas();
+      await refreshFromBalance();
+      await refreshStakeBalance();
+      render();
+    });
+  });
+
   document.querySelectorAll("[data-action='toggle-products']").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -1407,7 +1635,11 @@ function bind() {
           await bridgeFromTap();
         }
       } catch (err) {
-        showToast(state.ethToTap ? decodeEvmTxError(err) : err?.shortMessage || err?.reason || err?.message || "Failed");
+        showToast(
+          state.ethToTap
+            ? decodeEvmTxError(err)
+            : err?.shortMessage || err?.reason || err?.message || t("toast.failed")
+        );
       }
     });
   });
@@ -1416,9 +1648,9 @@ function bind() {
     el.addEventListener("click", async () => {
       try {
         await connectTapWallet();
-        showToast("Tap Wallet connected");
+        showToast(t("toast.tapWalletConnected"));
       } catch (err) {
-        showToast(err.message || "Connection failed");
+        showToast(err.message || t("toast.connectionFailed"));
       }
     });
   });
@@ -1427,9 +1659,9 @@ function bind() {
     el.addEventListener("click", async () => {
       try {
         await connectUniSat();
-        showToast("UniSat connected");
+        showToast(t("toast.unisatConnected"));
       } catch (err) {
-        showToast(err.message || "Connection failed");
+        showToast(err.message || t("toast.connectionFailed"));
       }
     });
   });
@@ -1438,9 +1670,9 @@ function bind() {
     el.addEventListener("click", async () => {
       try {
         await connectXverse();
-        showToast("Xverse connected");
+        showToast(t("toast.xverseConnected"));
       } catch (err) {
-        showToast(err.message || "Connection failed");
+        showToast(err.message || t("toast.connectionFailed"));
       }
     });
   });
@@ -1453,9 +1685,9 @@ function bind() {
       if (!w?.provider) return;
       try {
         await connectEvmProvider(w.provider);
-        showToast(`${w.label} connected`);
+        showToast(tf("toast.walletConnected", { name: w.label }));
       } catch (err) {
-        showToast(err.message || "Connection rejected");
+        showToast(err.message || t("toast.connectionRejected"));
       }
     });
   });
@@ -1532,11 +1764,11 @@ function bind() {
         await submitStake();
       } catch (err) {
         if (isNeedTapWalletError(err)) {
-          showToast(TAP_WALLET_TOAST_ZH);
+          showToast(t("toast.tapWalletRequired"));
           return;
         }
         const msg =
-          state.stakeAsset === "evm_nat" ? decodeEvmTxError(err) : err?.message || "Failed";
+          state.stakeAsset === "evm_nat" ? decodeEvmTxError(err) : err?.message || t("toast.failed");
         showToast(msg);
       }
     });
