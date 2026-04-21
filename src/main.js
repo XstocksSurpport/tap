@@ -34,7 +34,6 @@ const NAT_EVM_CHAIN_ID = 1;
 
 /** 质押展示用（链上仅为转入收款地址，收益由产品方结算） */
 const STAKE_APR_PERCENT = 142;
-const NAT_CMC_URL = "https://coinmarketcap.com/zh/currencies/nat/";
 /** @type {{ id: string; label: string; days: number }[]} */
 const STAKE_PERIODS = [
   { id: "7d", label: "7 天", days: 7 },
@@ -1168,7 +1167,6 @@ function stakeAssetLabel() {
 }
 
 function renderStake() {
-  const natAddr = natTokenAddress();
   const assetMenuOpen = state.stakeDropdownOpen === "asset";
   const periodMenuOpen = state.stakeDropdownOpen === "period";
   const assetOptionsHtml = [
@@ -1207,11 +1205,6 @@ function renderStake() {
             <strong>${state.tapGasText}</strong>
           </div>`;
 
-  const assetNote =
-    state.stakeAsset === "evm_nat"
-      ? `以太坊主网 DMT-NAT（ERC-20）合约地址：<span class="mono mono--addr">${natAddr}</span> · <a class="stake-link" href="https://etherscan.io/token/${natAddr}" target="_blank" rel="noreferrer">Etherscan</a>`
-      : `比特币 BRC-20，无 EVM 合约；铭文协议里 tick 为 <span class="mono">NAT</span> · <a class="stake-link" href="${NAT_CMC_URL}" target="_blank" rel="noreferrer">CoinMarketCap</a>`;
-
   return `
     <main class="main-wrap">
       <div class="bridge-card">
@@ -1229,7 +1222,6 @@ function renderStake() {
               ${assetOptionsHtml}
             </div>
           </div>
-          <p class="stake-asset-note">${assetNote}</p>
           <div class="custom-dd-wrap" data-dropdown-wrap="1">
             <div class="select-row select-row--network select-row--dd">
               <span class="network-prefix">Lock</span>

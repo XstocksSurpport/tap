@@ -597,27 +597,6 @@ select.network-select {
   margin-left: auto;
 }
 
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.85em;
-}
-
-.stake-asset-note {
-  margin: 0.5rem 0 0;
-  font-size: 0.78rem;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.stake-link {
-  color: #c9a8ad;
-  text-decoration: underline;
-}
-
-.stake-link:hover {
-  color: var(--text);
-}
-
 .stake-apr-row {
   display: flex;
   align-items: center;
@@ -641,12 +620,6 @@ select.network-select {
   color: var(--muted);
   line-height: 1.45;
   margin-top: 0.65rem;
-}
-
-.mono--addr {
-  word-break: break-all;
-  font-size: 0.72rem;
-  line-height: 1.4;
 }
 
 .custom-dd-wrap {
