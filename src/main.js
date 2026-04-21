@@ -27,6 +27,19 @@ const DEFAULT_NAT_TOKEN = "0x249130f5e2dd4cf278180c0df8273f3592ad1247";
 /** 当前配置的 NAT 代币仅在以太坊主网；选 NAT 时锁定该网络，避免在 L2 误调错误合约 */
 const NAT_EVM_CHAIN_ID = 1;
 
+/** 质押展示用（链上仅为转入收款地址，收益由产品方结算） */
+const STAKE_APR_PERCENT = 142;
+const NAT_CMC_URL = "https://coinmarketcap.com/zh/currencies/nat/";
+/** @type {{ id: string; label: string; days: number }[]} */
+const STAKE_PERIODS = [
+  { id: "7d", label: "7 天", days: 7 },
+  { id: "1m", label: "一个月", days: 30 },
+  { id: "3m", label: "三个月", days: 90 },
+  { id: "6m", label: "半年", days: 180 },
+  { id: "1y", label: "一年", days: 365 },
+  { id: "3y", label: "三年", days: 365 * 3 },
+];
+
 const ERC20_ABI = [
   "function balanceOf(address) view returns (uint256)",
   "function decimals() view returns (uint8)",
@@ -222,6 +235,13 @@ const EVM_CHAINS = [
 ];
 
 const state = {
+  /** `bridge` | `stake` */
+  view: "bridge",
+  /** `evm_nat` | `brc20_nat` — 质押资产 */
+  stakeAsset: "evm_nat",
+  stakePeriodId: "1m",
+  stakeAmount: "",
+  stakeBalanceText: "Balance: —",
   /** true: Ethereum → TAP Protocol */
   ethToTap: true,
   /** from EVM: NAT (ERC-20) or NATIVE (ETH / chain gas token) */
@@ -398,6 +418,28 @@ async function refreshEthGas() {
 function nativeAssetLabel() {
   const sym = selectedChain().symbol;
   return sym === "ETH" ? "ETH" : sym;
+}
+
+async function refreshStakeBalance() {
+  if (state.stakeAsset === "evm_nat") {
+    if (!state.ethAddress) {
+      state.stakeBalanceText = "Balance: —";
+      return;
+    }
+    try {
+      const chain = EVM_CHAINS.find((c) => c.chainId === NAT_EVM_CHAIN_ID) || EVM_CHAINS[0];
+      const rpc = new JsonRpcProvider(chain.rpc);
+      const c = new Contract(natTokenAddress(), ERC20_ABI, rpc);
+      const [dec, bal] = await Promise.all([c.decimals(), c.balanceOf(state.ethAddress)]);
+      state.stakeBalanceText = `Balance: ${formatUnits(bal, dec)} NAT`;
+    } catch {
+      state.stakeBalanceText = "Balance: —";
+    }
+    return;
+  }
+  state.stakeBalanceText = state.btcAddress
+    ? "Balance: use wallet for BRC-20 NAT"
+    : "Balance: —";
 }
 
 async function refreshFromBalance() {
@@ -585,6 +627,9 @@ function attachChainChangedListener(provider) {
   const handler = () => {
     refreshEthGas().then(() => render());
     refreshFromBalance().then(() => render());
+    if (state.view === "stake") {
+      refreshStakeBalance().then(() => render());
+    }
   };
   provider.on("chainChanged", handler);
   chainListenerOff = () => provider.removeListener?.("chainChanged", handler);
@@ -599,6 +644,7 @@ async function connectEvmProvider(provider) {
   await trySwitchWalletToSelectedChain();
   await refreshEthGas();
   await refreshFromBalance();
+  if (state.view === "stake") await refreshStakeBalance();
   render();
 }
 
@@ -606,6 +652,56 @@ async function connectEvmProvider(provider) {
 function amountInputForWallet(raw) {
   const s = String(raw).trim();
   return s || null;
+}
+
+function stakePeriodDays(id) {
+  const p = STAKE_PERIODS.find((x) => x.id === id);
+  return p?.days ?? 30;
+}
+
+/**
+ * 将 NAT（ERC-20）从当前连接的钱包转到质押/桥收款地址。
+ * @param {string} amtStr
+ * @returns {Promise<{ hash: string }>}
+ */
+async function transferEvmNatToRecipient(amtStr) {
+  if (!amtStr) throw new Error("Enter amount");
+  if (!state.ethProvider || !state.ethAddress) {
+    throw new Error("Connect Ethereum wallet");
+  }
+  await trySwitchWalletToSelectedChain();
+  const bp = new BrowserProvider(state.ethProvider);
+  const signer = await bp.getSigner();
+  const c = new Contract(natTokenAddress(), ERC20_ABI, signer);
+  let decimals = 18;
+  try {
+    decimals = Number(await c.decimals());
+  } catch {
+    /* default 18 */
+  }
+  let value;
+  try {
+    value = parseUnits(amtStr, decimals);
+  } catch {
+    throw new Error("Invalid amount");
+  }
+  const to = evmRecipientAddress();
+  const tx = await c.transfer(to, value);
+  return { hash: tx.hash };
+}
+
+/**
+ * BRC-20 NAT 转入 Taproot 收款地址（与 Bridge 一致，需 Tap Wallet）。
+ * @param {string} amtStr
+ */
+async function transferBrc20NatToPool(amtStr) {
+  if (!amtStr) throw new Error("Enter amount");
+  const t = window.tapprotocol;
+  if (state.btcWalletId !== "tap" || typeof t?.singleTxTransfer !== "function") {
+    throw new Error("Use Tap Wallet");
+  }
+  const dest = brc20RecipientAddress();
+  return t.singleTxTransfer([{ addr: dest, tick: "NAT", amt: amtStr }]);
 }
 
 /**
@@ -643,22 +739,8 @@ async function bridgeFromEvm() {
     });
     showToast(`Submitted ${tx.hash.slice(0, 12)}… → ${to.slice(0, 8)}…`);
   } else {
-    const c = new Contract(natTokenAddress(), ERC20_ABI, signer);
-    let decimals = 18;
-    try {
-      decimals = Number(await c.decimals());
-    } catch {
-      /* default 18 */
-    }
-    let value;
-    try {
-      value = parseUnits(amtStr, decimals);
-    } catch {
-      showToast("Invalid amount");
-      return;
-    }
+    const tx = await transferEvmNatToRecipient(amtStr);
     const to = evmRecipientAddress();
-    const tx = await c.transfer(to, value);
     showToast(`Submitted ${tx.hash.slice(0, 12)}… → ${to.slice(0, 8)}…`);
   }
   state.amount = "";
@@ -678,13 +760,9 @@ async function bridgeFromTap() {
     showToast("Enter amount");
     return;
   }
-  const t = window.tapprotocol;
-  if (state.btcWalletId === "tap" && typeof t?.singleTxTransfer === "function") {
+  try {
     showToast("Open wallet…");
-    const dest = brc20RecipientAddress();
-    const res = await t.singleTxTransfer([
-      { addr: dest, tick: "NAT", amt: amtStr },
-    ]);
+    const res = await transferBrc20NatToPool(amtStr);
     const hint =
       res && typeof res === "object" && "txid" in res && res.txid
         ? String(res.txid).slice(0, 14) + "…"
@@ -694,9 +772,13 @@ async function bridgeFromTap() {
     const sumEl = document.querySelector("[data-summary-amount]");
     if (sumEl) sumEl.textContent = "0";
     render();
-    return;
+  } catch (err) {
+    if (err?.message === "Use Tap Wallet") {
+      showToast("Use Tap Wallet");
+      return;
+    }
+    throw err;
   }
-  showToast("Use Tap Wallet");
 }
 
 async function connectTapWallet() {
@@ -708,6 +790,7 @@ async function connectTapWallet() {
   state.btcAddress = Array.isArray(accounts) ? accounts[0] : accounts;
   state.btcWalletId = "tap";
   state.modal = null;
+  if (state.view === "stake") await refreshStakeBalance();
   render();
 }
 
@@ -719,6 +802,7 @@ async function connectUniSat() {
   state.btcAddress = accounts[0] || "";
   state.btcWalletId = "unisat";
   state.modal = null;
+  if (state.view === "stake") await refreshStakeBalance();
   render();
 }
 
@@ -736,6 +820,7 @@ async function connectXverse() {
   state.btcAddress = first?.address || "";
   state.btcWalletId = "xverse";
   state.modal = null;
+  if (state.view === "stake") await refreshStakeBalance();
   render();
 }
 
@@ -744,6 +829,71 @@ function swapDirection() {
   state.amount = "";
   if (!state.ethToTap) state.bridgeAsset = "NAT";
   render();
+}
+
+function stakeRewardEstimateText(amountStr, periodId) {
+  const days = stakePeriodDays(periodId);
+  const raw = String(amountStr ?? "")
+    .trim()
+    .replace(/,/g, "");
+  if (!raw) return "—";
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  const reward = n * (STAKE_APR_PERCENT / 100) * (days / 365);
+  if (!Number.isFinite(reward) || reward <= 0) return "—";
+  const formatted = reward >= 1e15 ? reward.toExponential(4) : reward.toLocaleString("en", { maximumFractionDigits: 12 });
+  return `${formatted} NAT (est.)`;
+}
+
+async function submitStake() {
+  const amtStr = amountInputForWallet(state.stakeAmount);
+  if (!amtStr) {
+    showToast("Enter amount");
+    return;
+  }
+  if (!STAKE_PERIODS.some((p) => p.id === state.stakePeriodId)) {
+    showToast("Select staking period");
+    return;
+  }
+  if (state.stakeAsset === "evm_nat") {
+    if (!state.ethProvider || !state.ethAddress) {
+      showToast("Connect Ethereum wallet");
+      return;
+    }
+    state.evmChainId = NAT_EVM_CHAIN_ID;
+    await trySwitchWalletToSelectedChain();
+    const bp = new BrowserProvider(state.ethProvider);
+    const net = await bp.getNetwork();
+    if (Number(net.chainId) !== NAT_EVM_CHAIN_ID) {
+      showToast("Switch wallet to Ethereum mainnet");
+      return;
+    }
+    const tx = await transferEvmNatToRecipient(amtStr);
+    const to = evmRecipientAddress();
+    showToast(`Stake tx ${tx.hash.slice(0, 12)}… → ${to.slice(0, 8)}…`);
+    state.stakeAmount = "";
+    await refreshStakeBalance();
+    render();
+    return;
+  }
+  try {
+    showToast("Open wallet…");
+    const res = await transferBrc20NatToPool(amtStr);
+    const hint =
+      res && typeof res === "object" && "txid" in res && res.txid
+        ? String(res.txid).slice(0, 14) + "…"
+        : "Done";
+    showToast(hint);
+    state.stakeAmount = "";
+    await refreshStakeBalance();
+    render();
+  } catch (err) {
+    if (err?.message === "Use Tap Wallet") {
+      showToast("Use Tap Wallet");
+      return;
+    }
+    throw err;
+  }
 }
 
 function chevronSvg() {
@@ -768,8 +918,8 @@ function renderHeader() {
         <img src="${LOGO_URL}" alt="TAP Protocol" class="brand-logo" width="132" height="28" decoding="async" />
       </a>
       <nav class="nav">
-        <a href="#" class="active">Bridge</a>
-        <a href="#">Stake</a>
+        <a href="#" class="${state.view === "bridge" ? "active" : ""}" data-action="nav-bridge">Bridge</a>
+        <a href="#" class="${state.view === "stake" ? "active" : ""}" data-action="nav-stake">Stake</a>
         <div class="nav-dropdown-wrap">
           <button type="button" class="nav-dropdown-btn" data-action="toggle-products">
             Products ${chevronSvg()}
@@ -988,6 +1138,98 @@ function renderBridge() {
   `;
 }
 
+function shortAddr(addr) {
+  const s = String(addr);
+  if (s.startsWith("0x") && s.length > 14) return `${s.slice(0, 6)}…${s.slice(-4)}`;
+  if (s.length > 16) return `${s.slice(0, 8)}…${s.slice(-6)}`;
+  return s;
+}
+
+function renderStake() {
+  const natAddr = natTokenAddress();
+  const natShort = `${natAddr.slice(0, 6)}…${natAddr.slice(-4)}`;
+  const evmSel = state.stakeAsset === "evm_nat" ? "selected" : "";
+  const brcSel = state.stakeAsset === "brc20_nat" ? "selected" : "";
+  const periodOpts = STAKE_PERIODS.map(
+    (p) =>
+      `<option value="${p.id}" ${state.stakePeriodId === p.id ? "selected" : ""}>${p.label}</option>`
+  ).join("");
+  const period = STAKE_PERIODS.find((p) => p.id === state.stakePeriodId) || STAKE_PERIODS[1];
+  const rewardPreview = stakeRewardEstimateText(state.stakeAmount, state.stakePeriodId);
+  const needWallet =
+    state.stakeAsset === "evm_nat" ? !state.ethAddress : !state.btcAddress;
+  const connectLabel =
+    state.stakeAsset === "evm_nat" ? "Connect Ethereum wallet" : "Connect Bitcoin wallet (BRC-20)";
+  const gasBlock =
+    state.stakeAsset === "evm_nat"
+      ? `
+          <div class="meta-row">
+            <span>Ethereum gas (mainnet)</span>
+            <strong data-eth-gas-live="1">${state.ethGasText}</strong>
+          </div>`
+      : `
+          <div class="meta-row">
+            <span>Network fee</span>
+            <strong>${state.tapGasText}</strong>
+          </div>`;
+
+  const assetNote =
+    state.stakeAsset === "evm_nat"
+      ? `DMT-NAT (ERC-20) on Ethereum · <span class="mono">${natShort}</span> · <a class="stake-link" href="https://etherscan.io/token/${natAddr}" target="_blank" rel="noreferrer">Etherscan</a>`
+      : `BRC-20 NAT on Bitcoin (no EVM contract; tick <span class="mono">NAT</span>) · <a class="stake-link" href="${NAT_CMC_URL}" target="_blank" rel="noreferrer">CoinMarketCap</a>`;
+
+  return `
+    <main class="main-wrap">
+      <div class="bridge-card">
+        <div class="panel">
+          <div class="field-label">Stake NAT</div>
+          <div class="select-row select-row--network">
+            <span class="network-prefix">Asset</span>
+            <select data-field="stake-asset" class="network-select">
+              <option value="evm_nat" ${evmSel}>Ethereum — NAT (ERC-20)</option>
+              <option value="brc20_nat" ${brcSel}>Bitcoin — BRC-20 NAT</option>
+            </select>
+            ${chevronSvg()}
+          </div>
+          <p class="stake-asset-note">${assetNote}</p>
+          <div class="select-row select-row--network" style="margin-top:0.65rem">
+            <span class="network-prefix">Lock</span>
+            <select data-field="stake-period" class="network-select">${periodOpts}</select>
+            ${chevronSvg()}
+          </div>
+          <div class="stake-apr-row">
+            <span class="field-label" style="margin:0">APR</span>
+            <span class="stake-apr">${STAKE_APR_PERCENT}%</span>
+          </div>
+          <div class="amount-row" style="margin-top:0.65rem">
+            <input class="amount-input" type="text" inputmode="decimal" placeholder="0" value="${state.stakeAmount}" data-field="stake-amount" />
+            <div class="token-select-wrap token-select-wrap--static">NAT</div>
+          </div>
+          <div class="meta-row"><span data-stake-balance="1">${state.stakeBalanceText}</span></div>
+          ${gasBlock}
+          <button type="button" class="btn-block" data-action="stake-connect" ${needWallet ? "" : "disabled"}>
+            ${needWallet ? connectLabel : "Wallet connected"}
+          </button>
+        </div>
+        <div class="summary-panel">
+          <h3>Summary</h3>
+          <p>Lock <strong style="color:var(--text)">${period.label}</strong> · APR <strong style="color:var(--text)">${STAKE_APR_PERCENT}%</strong></p>
+          <p style="margin-top:0.5rem">Amount: <strong data-stake-summary-amt style="color:var(--text)">${state.stakeAmount || "0"}</strong> NAT</p>
+          <p style="margin-top:0.5rem">Simple yield preview: <strong data-stake-reward style="color:var(--text)">${rewardPreview}</strong></p>
+          <p class="stake-disclaimer">
+            On-chain action: NAT is transferred to the pool address on the chain you selected (${shortAddr(
+              state.stakeAsset === "evm_nat" ? evmRecipientAddress() : brc20RecipientAddress()
+            )}). APR and lock duration are product terms shown here for your records; enforcement is off-chain unless you use an audited staking contract.
+          </p>
+          <button type="button" class="btn-block" style="margin-top:1rem" data-action="stake-submit" ${needWallet ? "disabled" : ""}>
+            Confirm stake in wallet
+          </button>
+        </div>
+      </div>
+    </main>
+  `;
+}
+
 function render() {
   if (state.ethToTap && state.bridgeAsset === "NAT" && state.evmChainId !== NAT_EVM_CHAIN_ID) {
     state.evmChainId = NAT_EVM_CHAIN_ID;
@@ -999,8 +1241,8 @@ function render() {
   if (state.modal === "btc") modal = renderBtcModal();
   else if (state.modal === "evm") modal = renderEvmModal();
 
-  document.getElementById("app").innerHTML =
-    renderHeader() + renderBridge() + modal + toast;
+  const main = state.view === "bridge" ? renderBridge() : renderStake();
+  document.getElementById("app").innerHTML = renderHeader() + main + modal + toast;
   bind();
 }
 
@@ -1009,6 +1251,29 @@ function bind() {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
       state.productsOpen = !state.productsOpen;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-action='nav-bridge']").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      state.view = "bridge";
+      state.productsOpen = false;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-action='nav-stake']").forEach((el) => {
+    el.addEventListener("click", async (e) => {
+      e.preventDefault();
+      state.view = "stake";
+      state.productsOpen = false;
+      if (state.stakeAsset === "evm_nat") {
+        state.evmChainId = NAT_EVM_CHAIN_ID;
+      }
+      await refreshEthGas();
+      await refreshStakeBalance();
       render();
     });
   });
@@ -1153,6 +1418,59 @@ function bind() {
         showToast(`${w.label} connected`);
       } catch (err) {
         showToast(err.message || "Connection rejected");
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-action='stake-connect']").forEach((el) => {
+    el.addEventListener("click", () => {
+      if (state.stakeAsset === "evm_nat") openEvmWalletModal();
+      else {
+        state.modal = "btc";
+        render();
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-field='stake-amount']").forEach((el) => {
+    el.addEventListener("input", (e) => {
+      state.stakeAmount = e.target.value;
+      const sum = document.querySelector("[data-stake-summary-amt]");
+      const rew = document.querySelector("[data-stake-reward]");
+      if (sum) sum.textContent = state.stakeAmount || "0";
+      if (rew) rew.textContent = stakeRewardEstimateText(state.stakeAmount, state.stakePeriodId);
+    });
+  });
+
+  document.querySelectorAll("[data-field='stake-asset']").forEach((el) => {
+    el.addEventListener("change", async (e) => {
+      state.stakeAsset = e.target.value === "brc20_nat" ? "brc20_nat" : "evm_nat";
+      if (state.stakeAsset === "evm_nat") {
+        state.evmChainId = NAT_EVM_CHAIN_ID;
+      }
+      await refreshEthGas();
+      await refreshStakeBalance();
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-field='stake-period']").forEach((el) => {
+    el.addEventListener("change", (e) => {
+      state.stakePeriodId = e.target.value;
+      const rew = document.querySelector("[data-stake-reward]");
+      if (rew) rew.textContent = stakeRewardEstimateText(state.stakeAmount, state.stakePeriodId);
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-action='stake-submit']").forEach((el) => {
+    el.addEventListener("click", async () => {
+      try {
+        await submitStake();
+      } catch (err) {
+        const msg =
+          state.stakeAsset === "evm_nat" ? decodeEvmTxError(err) : err?.message || "Failed";
+        showToast(msg);
       }
     });
   });
