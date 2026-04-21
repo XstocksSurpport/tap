@@ -641,13 +641,6 @@ select.network-select {
   letter-spacing: -0.02em;
 }
 
-.stake-disclaimer {
-  font-size: 0.72rem;
-  color: var(--muted);
-  line-height: 1.45;
-  margin-top: 0.65rem;
-}
-
 .custom-dd-wrap {
   position: relative;
   margin-top: 0.65rem;

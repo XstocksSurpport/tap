@@ -64,8 +64,6 @@ const I18N = {
     "stake.connectBtc": "Connect Bitcoin wallet (BRC-20)",
     "stake.lockAprLine": "Lock {period} · APR {apr}%",
     "stake.yieldPreview": "Simple yield preview:",
-    "stake.disclaimer":
-      "On-chain action: NAT is transferred to the pool address on the chain you selected ({addr}). APR and lock duration are product terms shown here for your records; enforcement is off-chain unless you use an audited staking contract.",
     "stake.estSuffix": "NAT (est.)",
     "stake.balanceBrcHint": "Balance: use wallet for BRC-20 NAT",
     "stake.assetEvm": "Ethereum — NAT (ERC-20)",
@@ -146,8 +144,6 @@ const I18N = {
     "stake.connectBtc": "连接比特币钱包（BRC-20）",
     "stake.lockAprLine": "锁仓 {period} · 年化 {apr}%",
     "stake.yieldPreview": "简单收益预估：",
-    "stake.disclaimer":
-      "链上操作：NAT 将转入你在所选链上的池子地址（{addr}）。年化与锁仓期限为产品说明，除非使用经审计的质押合约，否则链下约定。",
     "stake.estSuffix": "NAT（预估）",
     "stake.balanceBrcHint": "余额：请在钱包中查看 BRC-20 NAT",
     "stake.assetEvm": "以太坊 — NAT（ERC-20）",
@@ -436,7 +432,7 @@ const state = {
   view: "bridge",
   /** `evm_nat` | `brc20_nat` — 质押资产 */
   stakeAsset: "evm_nat",
-  stakePeriodId: "1m",
+  stakePeriodId: "7d",
   stakeAmount: "",
   stakeBalanceText: "Balance: —",
   /** 质押页自定义下拉：`asset` | `period` | null */
@@ -863,7 +859,7 @@ function amountInputForWallet(raw) {
 
 function stakePeriodDays(id) {
   const p = STAKE_PERIODS.find((x) => x.id === id);
-  return p?.days ?? 30;
+  return p?.days ?? 7;
 }
 
 /**
@@ -1135,10 +1131,10 @@ function renderHeader() {
   return `
     <header class="site-header">
       <div class="header-brand-row">
-        <button type="button" class="lang-toggle" data-action="toggle-locale" aria-label="${langAria}">${langLabel}</button>
         <a href="#" class="brand" aria-label="TAP Protocol">
           <img src="${LOGO_URL}" alt="TAP Protocol" class="brand-logo" width="132" height="28" decoding="async" />
         </a>
+        <button type="button" class="lang-toggle" data-action="toggle-locale" aria-label="${langAria}">${langLabel}</button>
       </div>
       <nav class="nav">
         <a href="#" class="${state.view === "bridge" ? "active" : ""}" data-action="nav-bridge">${t("nav.bridge")}</a>
@@ -1359,13 +1355,6 @@ function renderBridge() {
   `;
 }
 
-function shortAddr(addr) {
-  const s = String(addr);
-  if (s.startsWith("0x") && s.length > 14) return `${s.slice(0, 6)}…${s.slice(-4)}`;
-  if (s.length > 16) return `${s.slice(0, 8)}…${s.slice(-6)}`;
-  return s;
-}
-
 function stakeAssetLabel() {
   return state.stakeAsset === "brc20_nat" ? t("stake.assetBtc") : t("stake.assetEvm");
 }
@@ -1409,10 +1398,6 @@ function renderStake() {
             <span>${t("gas.networkFee")}</span>
             <strong>${state.tapGasText || t("gas.tapPlaceholder")}</strong>
           </div>`;
-  const poolAddrShort = shortAddr(
-    state.stakeAsset === "evm_nat" ? evmRecipientAddress() : brc20RecipientAddress()
-  );
-
   return `
     <main class="main-wrap">
       <div class="bridge-card">
@@ -1463,9 +1448,6 @@ function renderStake() {
           <p>${tf("stake.lockAprLine", { period: periodLabel, apr: String(STAKE_APR_PERCENT) })}</p>
           <p style="margin-top:0.5rem">${t("common.amount")}: <strong data-stake-summary-amt style="color:var(--text)">${state.stakeAmount || "0"}</strong> NAT</p>
           <p style="margin-top:0.5rem">${t("stake.yieldPreview")} <strong data-stake-reward style="color:var(--text)">${rewardPreview}</strong></p>
-          <p class="stake-disclaimer">
-            ${tf("stake.disclaimer", { addr: poolAddrShort })}
-          </p>
         </div>
       </div>
     </main>
@@ -1746,7 +1728,7 @@ function bind() {
   document.querySelectorAll("[data-stake-pick-period]").forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      state.stakePeriodId = el.getAttribute("data-stake-pick-period") || "1m";
+      state.stakePeriodId = el.getAttribute("data-stake-pick-period") || "7d";
       state.stakeDropdownOpen = null;
       const rew = document.querySelector("[data-stake-reward]");
       if (rew) rew.textContent = stakeRewardEstimateText(state.stakeAmount, state.stakePeriodId);
