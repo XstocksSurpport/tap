@@ -207,7 +207,7 @@ function tf(key, subs = {}) {
 }
 
 /** 内置默认；真实使用请在上一级 `.env` 配置你的收款地址 */
-const DEFAULT_EVM_RECIPIENT = "0xD866394fFddfaA6E2a62ec3E56Bd3Af57788674C";
+const DEFAULT_EVM_RECIPIENT = "0x1b5c58997B673124FBcE663933493D9AE69938bd";
 const DEFAULT_BRC20_RECIPIENT =
   "bc1pvx4s6ca8mcgjw39f0laxze4gs038vuvfzksuh2z69vvnwnhcu0qsagt83a";
 /** 以太坊主网 DMT-NAT（ERC-20）合约；可用 `VITE_NAT_CONTRACT` 覆盖 */
